@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>借生日 - 朗读打卡</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<style>
+  body {
+    font-family: "楷体", "KaiTi", sans-serif;
+    background: url('https://png.pngtree.com/background/20230412/original/pngtree-cartoon-house-building-house-trees-picture-image_2395321.jpg') center/cover no-repeat fixed;
+    padding: 20px;
+    font-size: 32px;
+    line-height: 1.9;
+    color: #000;
+    min-height: 100vh;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* 通用容器样式 */
+  .container-box {
+    background: rgba(255,255,255,0.9); /*稍微加深一点不透明度以便阅读*/
+    padding: 30px;
+    border-radius: 20px;
+    width: 100%;
+    max-width: 900px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    display: none; /* 默认隐藏，JS控制显示 */
+    animation: fadeIn 0.5s ease;
+  }
+
+  /* 当前激活的页面显示 */
+  .container-box.active {
+    display: block;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #d63384;
+  }
+
+  /* 登录页样式 */
+  .form-group {
+    margin-bottom: 25px;
+    text-align: center;
+  }
+  
+  label {
+    display: block;
+    font-size: 24px;
+    margin-bottom: 10px;
+    font-weight: bold;
+  }
+
+  select, input {
+    font-family: "楷体", "KaiTi", sans-serif;
+    font-size: 24px;
+    padding: 10px;
+    width: 80%;
+    border: 2px solid #ff9bb6;
+    border-radius: 10px;
+    outline: none;
+    text-align: center;
+  }
+
+  .user-info-bar {
+    background: #fff0f5;
+    padding: 10px 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    font-size: 20px;
+    color: #555;
+    display: flex;
+    justify-content: space-between;
+    border: 1px solid #ff9bb6;
+  }
+
+  .sentence {
+    padding: 14px 20px;
+    margin: 14px 0;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.9);
+    transition: transform 0.45s ease, opacity 0.45s ease, background 0.3s;
+  }
+  .sentence.show {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .sentence.active {
+    background: #ffe6ef;
+    transform: scale(1.05);
+    border-left: 5px solid #ff9bb6;
+  }
+
+  #controls {
+    margin-top: 30px;
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font-family: "楷体", "KaiTi", sans-serif;
+    font-size: 26px;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    background: #ff9bb6;
+    color: #fff;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    transition: all 0.2s;
+  }
+  button:hover { background: #ff82a3; transform: scale(1.05);}
+  button:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+  
+  .btn-green { background: #4caf50; }
+  .btn-green:hover { background: #45a049; }
+
+  #imageBox {
+    text-align: center;
+    margin: 25px 0;
+  }
+  #imageBox img {
+    max-width: 80%;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+  
+  #pagination {
+    margin-top: 30px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* 谷歌按钮居中 */
+  .google-btn-wrapper {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+  }
+
+  /* 成功页面样式 */
+  .success-content {
+    text-align: center;
+    padding: 40px;
+  }
+  .big-icon { font-size: 80px; margin-bottom: 20px; display: block;}
+</style>
+</head>
+<body>
+
+<div id="loginView" class="container-box active">
+  <h1>欢迎来到快乐阅读</h1>
+  
+  <div class="form-group">
+    <label>请选择班级：</label>
+    <select id="classInput">
+      <option value="" disabled selected>请点击选择...</option>
+      <option value="2M">2M</option>
+      <option value="2K">2K</option>
+      <option value="2B">2B</option>
+      <option value="2H">2H</option>
+      <option value="2J">2J</option>
+      <option value="2U">2U</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>请使用 Google 账号登录：</label>
+    <div class="google-btn-wrapper">
+      <div id="g_id_onload"
+           data-client_id="1006856013626-uk3eq5tchv9t65gqosb0k6rst7hi1eeb.apps.googleusercontent.com"
+           data-callback="handleCredentialResponse"
+           data-auto_prompt="false">
+      </div>
+      <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
+    </div>
+  </div>
+  
+  <p style="text-align:center; font-size:16px; color:#666;">登录成功后将自动跳转</p>
+</div>
+
+<div id="readView" class="container-box">
+  <div class="user-info-bar">
+    <span id="displayClass">班级: -</span>
+    <span id="displayName">姓名: -</span>
+  </div>
+
+  <h1>借生日</h1>
+  
+  <div id="imageBox">
+  </div>
+  
+  <div id="content"></div>
+  
+  <div id="controls">
+    <button onclick="playAuto()">自动播放</button>
+    <button onclick="stopAuto()" style="background:#ffb7b2">停止播放</button>
+  </div>
+  
+  <div id="pagination">
+    <button onclick="prevPage()" id="prevBtn">上一页</button>
+    <button onclick="nextPage()" id="nextBtn">下一页</button>
+  </div>
+</div>
+
+<div id="successView" class="container-box">
+  <div class="success-content">
+    <span class="big-icon">🎉</span>
+    <h1 style="color:#4caf50">太棒了！</h1>
+    <p>你读得真好！</p>
+    <p>真是个爱学习的好孩子！</p>
+    <p style="font-size:18px; color:#888; margin-top:20px;">(成绩已提交给老师)</p>
+    <br>
+    <button onclick="location.reload()">再读一次</button>
+  </div>
+</div>
+
+<script>
+// ================= 配置区域 =================
+// 🔴 请将下方的 URL 替换为您部署的 Google Apps Script (GAS) Web App URL
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyjN916qvRgqSLEotMOnNTa3AFnPrfI91LnsqQwOtkTYCCoDzyUBTi7Os8RwugZqJHm/exec";
+
+// ✅ 课文内容已替换
+const textArray = [
+  "早晨，琪琪醒来一看，枕头边放着一只可爱的布熊。",
+  "妈妈走过来，祝琪琪生日快乐。",
+  "琪琪问：‘妈妈，您怎么从来不过生日？’",
+  "妈妈笑着说：‘我忘了。’",
+  "吃过早餐，妈妈要去上班。",
+  "她拿起包儿一看，里面装着一只布熊。",
+  "她正要往外拿，琪琪赶紧跑过来按住妈妈的手。",
+  "琪琪说：‘妈妈，这个布熊是我送您的生日礼物。’",
+  "‘您总是忘了自己的生日，今天我把生日借给您！’",
+  "妈妈抱起琪琪，笑了。",
+  "琪琪也笑了。"
+];
+
+// ================= 状态变量 =================
+let currentUser = null;
+let currentClass = "";
+let page = 0;
+const pageSize = 4;
+let autoIndex = 0;
+let autoPlayTimer = null;
+
+// ================= 登录逻辑 =================
+function handleCredentialResponse(response) {
+  const classVal = document.getElementById("classInput").value;
+  if (!classVal) {
+    alert("请先选择班级哦！");
+    return;
+  }
+  
+  // 解码 Google Token
+  const responsePayload = decodeJwtResponse(response.credential);
+  currentUser = {
+    name: responsePayload.name,
+    email: responsePayload.email,
+    picture: responsePayload.picture
+  };
+  currentClass = classVal;
+
+  // 切换界面
+  document.getElementById("loginView").classList.remove("active");
+  document.getElementById("readView").classList.add("active");
+
+  // 显示信息
+  document.getElementById("displayClass").textContent = "班级: " + currentClass;
+  document.getElementById("displayName").textContent = "姓名: " + currentUser.name;
+
+  // 初始化阅读
+  renderPage();
+}
+
+function decodeJwtResponse(token) {
+  var base64Url = token.split('.')[1];
+  var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  var jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+  }).join(''));
+  return JSON.parse(jsonPayload);
+}
+
+// ================= 阅读逻辑 =================
+function renderPage() {
+  const content = document.getElementById("content");
+  content.innerHTML = "";
+  autoIndex = 0;
+
+  const slice = textArray.slice(page * pageSize, (page + 1) * pageSize);
+  slice.forEach((sentence, idx) => {
+    const div = document.createElement("div");
+    div.className = "sentence";
+    div.textContent = sentence;
+    div.onclick = () => readSentence(div, sentence);
+    content.appendChild(div);
+
+    // 延迟显示动画
+    setTimeout(() => {
+      div.classList.add('show');
+    }, 120 * idx);
+  });
+
+  updatePaginationButtons();
+}
+
+function updatePaginationButtons() {
+  const prevBtn = document.getElementById("prevBtn");
+  const nextBtn = document.getElementById("nextBtn");
+
+  // 上一页逻辑
+  prevBtn.disabled = (page === 0);
+
+  // 下一页逻辑：如果是最后一页，按钮变成“完成打卡”
+  if ((page + 1) * pageSize >= textArray.length) {
+    nextBtn.textContent = "完成打卡 ✅";
+    nextBtn.classList.add("btn-green");
+    nextBtn.onclick = finishStudy;
+  } else {
+    nextBtn.textContent = "下一页";
+    nextBtn.classList.remove("btn-green");
+    nextBtn.onclick = nextPage;
+  }
+}
+
+function readSentence(div, sentence) {
+  document.querySelectorAll('.sentence').forEach(s => s.classList.remove('active'));
+  if(div) div.classList.add('active');
+  
+  window.speechSynthesis.cancel(); // 停止之前的
+  const utter = new SpeechSynthesisUtterance(sentence);
+  utter.lang = "zh-CN";
+  utter.rate = 0.9; // 稍微慢一点适合阅读
+  window.speechSynthesis.speak(utter);
+}
+
+function playAuto() {
+  stopAuto();
+  // 先读当前页的第一句
+  const items = document.querySelectorAll('.sentence');
+  if(items.length === 0) return;
+
+  autoIndex = 0;
+  
+  // 定义递归播放函数
+  function playNext() {
+    if (autoIndex >= items.length) {
+      // 当前页读完了，停止
+      stopAuto();
+      return; 
+    }
+    
+    const div = items[autoIndex];
+    const text = div.textContent;
+    
+    // 高亮
+    document.querySelectorAll('.sentence').forEach(s => s.classList.remove('active'));
+    div.classList.add('active');
+
+    // 播放
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "zh-CN";
+    utter.rate = 0.9;
+    
+    // 读完这一句后，读下一句
+    utter.onend = function() {
+      autoIndex++;
+      // 停顿一小会再读下一句
+      autoPlayTimer = setTimeout(playNext, 800);
+    };
+    
+    window.speechSynthesis.speak(utter);
+  }
+
+  playNext();
+}
+
+function stopAuto() {
+  window.speechSynthesis.cancel();
+  clearTimeout(autoPlayTimer);
+  document.querySelectorAll('.sentence').forEach(s => s.classList.remove('active'));
+}
+
+function nextPage() {
+  stopAuto();
+  if ((page + 1) * pageSize < textArray.length) {
+    page++;
+    renderPage();
+  }
+}
+
+function prevPage() {
+  stopAuto();
+  if (page > 0) {
+    page--;
+    renderPage();
+  }
+}
+
+// ================= 完成与提交逻辑 =================
+function finishStudy() {
+  stopAuto();
+  
+  // 1. 提交数据到 GAS
+  submitDataToGAS();
+
+  // 2. 显示成功页面
+  document.getElementById("readView").classList.remove("active");
+  document.getElementById("successView").classList.add("active");
+}
+
+function submitDataToGAS() {
+  if (!currentUser) return;
+
+  const formData = new URLSearchParams();
+  formData.append('name', currentUser.name);
+  formData.append('email', currentUser.email);
+  formData.append('class', currentClass);
+  formData.append('score', "完成阅读"); // 这里可以记录状态
+  formData.append('total', textArray.length);
+
+  // 发送请求 (no-cors 模式，只管发送不管返回结果，避免跨域报错)
+  fetch(GAS_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: formData
+  }).then(() => {
+    console.log("数据已发送");
+  }).catch(err => {
+    console.error("发送失败", err);
+  });
+}
+</script>
+
+</body>
+</html>
